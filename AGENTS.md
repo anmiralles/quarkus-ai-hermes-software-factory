@@ -27,7 +27,8 @@ Do not mark a card done on the strength of a green local build alone.
 
 ## Git rules
 
-- **Never commit to `main`.** Branch as `task/<card-id>-<short-slug>`.
+- **Never commit to `main`.** Branch as `task/<short-slug>`, slug derived from the
+  card title. The card id goes in the commit subject and the PR title.
 - **Never force-push.** Never rewrite published history.
 - **Never merge a PR.** Opening the PR is the bot's job; merging is Angel's.
 - One card → one branch → one PR. Do not bundle unrelated work into one PR.
