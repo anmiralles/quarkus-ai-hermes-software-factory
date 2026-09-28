@@ -48,6 +48,12 @@ what the `architect` intends to build and who it is assigned to. Rejecting here 
 a review; rejecting after five bots have run costs five agents' worth of tokens. This
 is deliberately placed where it is cheapest.
 
+> **This gate depends on `kanban.auto_decompose: false`.** When the built-in
+> auto-decomposer is enabled, the dispatcher builds the child graph itself on the next
+> tick — before any bot runs — and promotes the first child immediately. No card ever
+> enters `review`, so the gate silently does not exist and work just starts. Keep it
+> disabled; verify with `hermes -p default config get kanban.auto_decompose`.
+
 **Gate 2 — review the PR.** Every backend, frontend and test change reaches Angel as
 an open pull request. This is technically enforced, not just social:
 
