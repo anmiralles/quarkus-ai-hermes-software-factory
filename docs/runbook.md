@@ -169,13 +169,20 @@ redundant re-reading caused by underspecified cards.
 | 10 | **Merge as you go** | Stale bases caused each PR to re-show the whole tree — and each bot to rebuild the project. That was the biggest waste so far |
 | 11 | **Avoid `--goal` by default** | The judge loop can run many turns in one session |
 
-Use `completion_contract` to make the DoD non-negotiable rather than advisory:
+**Leave `completion_contract` at its default, `local-only`.** A contract naming a repo
+or PR URL makes completion depend on evidence the *human* closing the card cannot
+supply — the dashboard has no `published_pr` field — so the card stalls in `review`
+with `PR acceptance missing`, however good the work is.
+
+Nothing is lost by leaving it alone: `backend-tests` and `frontend-tests` are
+**required on `main`**, so a red PR cannot merge at all. The CI gate sits on the pull
+request, where it applies to everyone and cannot be bypassed — not on the card, where
+only the CLI can satisfy it.
 
 ```bash
---completion-contract anmiralles/quarkus-ai-hermes-software-factory
+# the default, and what human-reviewed cards should use:
+--completion-contract local-only
 ```
-
-The card cannot be marked done until something is genuinely published to that repo.
 
 ---
 
