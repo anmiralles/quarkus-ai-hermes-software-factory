@@ -1,4 +1,4 @@
-# ADR-006: The frontend reaches the backend through its own dev-server proxy, not through CORS
+# ADR-003: The frontend reaches the backend through its own dev-server proxy, not through CORS
 
 Status: accepted
 Date: 2026-09-28
