@@ -84,7 +84,54 @@ Consequence for the implementer: `npm install` resolves and the **lockfile is co
 Reference versions resolved from the registry on 2026-09-28 (use as a sanity check, do not
 hard-code ranges beyond what npm writes into the lockfile): React 19.3, Vite 8.3,
 TypeScript 7.0, Vitest 5.0, `@testing-library/react` 16.3, MSW 2.15,
-`@tanstack/react-query` 5.104, jsdom 30.1.
+`@tanstack/react-query` 5.104, jsdom 30.1. **Also required: `@types/react` and
+`@types/react-dom`** — React 19 ships no bundled types, and without them `tsc --noEmit`
+fails with `TS7016`/`TS7026` on every JSX element.
+
+### 3.1 The stack was exercised on this box before this plan was written
+
+A throwaway spike (Vite + React + TS + Vitest + RTL + MSW, with the D-3 proxy and one test
+per UI state) was built and run on 2026-09-28 to prove the plan is installable and that the
+proxy actually reaches the backend. Raw results:
+
+```
+$ npm ls --depth=0
+├── @tanstack/react-query@5.104.0   ├── @testing-library/react@16.3.3
+├── @testing-library/jest-dom@7.0.1 ├── @testing-library/user-event@14.6.7
+├── @types/react-dom@19.3.0         ├── @types/react@19.3.0
+├── @vitejs/plugin-react@6.1.1      ├── jsdom@30.1.1
+├── msw@2.15.0                      ├── react-dom@19.3.0
+├── react@19.3.0                    ├── typescript@7.0.2
+├── vite@8.3.1                      └── vitest@5.0.2
+
+$ npm run typecheck      -> tsc --noEmit, exit 0
+$ npm run test -- --run  -> Test Files  1 passed (1) / Tests  3 passed (3)  [list, empty, 500]
+$ npm run build          -> vite v8.3.1, 61 modules transformed, dist/assets/index-*.js 246.24 kB, built in 330ms
+```
+
+```
+# with the real backend running (`cd backend && ./mvnw quarkus:dev`, dev profile, :8080)
+$ curl -s http://localhost:5173/coffees                 # through the Vite dev-server proxy
+{"content":[],"page":0,"size":20,"totalElements":0,"totalPages":0}
+$ curl -s -X POST http://localhost:5173/coffees -H 'Content-Type: application/json' \
+    -d '{"name":"Proxy Smoke Test","roastLevel":"DARK","origin":"Colombia","price":9.50,"stock":7}'
+HTTP/1.1 201 Created
+location: /coffees/d11356a1-3fa3-4a2c-b801-2276b44dfe3b
+{"id":"d11356a1-...","name":"Proxy Smoke Test","roastLevel":"DARK","origin":"Colombia",
+ "price":9.50,"stock":7,"createdAt":"2026-09-28T15:11:30.569146134Z", ...}
+$ curl -s -X POST http://localhost:5173/coffees -d '{...,"id":"nope"}'   # D-5's rationale, confirmed
+{"type":"about:blank","title":"Bad Request","status":400,"detail":"Malformed request body",
+ "instance":"/coffees","errors":[{"field":"id","message":"unknown field 'id'"}]}
+```
+
+`vite preview` (port 4173) was exercised the same way and proxies `/coffees` identically.
+Two operational facts follow from the spike and are carried into the cards:
+
+- `./mvnw quarkus:dev` starts on :8080 in ~18 s **after** the first Maven resolution; the
+  dev profile is file-backed H2 under `backend/target/h2/`, so data persists between runs.
+- npm 11 prints `allow-scripts` warnings for `msw@2.15.0`'s postinstall. It is harmless for
+  Node-mode MSW (the postinstall only prepares the browser service worker, which these tests
+  do not use) — do not "fix" it by vendoring or by enabling scripts blindly.
 
 ---
 
