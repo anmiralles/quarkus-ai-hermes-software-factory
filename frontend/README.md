@@ -3,7 +3,7 @@
 React + TypeScript single-page app that performs every CRUD operation of the Coffee API
 (create, list, read, update, delete). It talks to the API through its **own dev/preview
 server proxy**, so `/coffees` is same-origin and the backend needs no CORS — see
-[`../docs/adr/ADR-003-frontend-integration-without-cors.md`](../docs/adr/ADR-003-frontend-integration-without-cors.md).
+[`../docs/adr/ADR-006-frontend-integration-without-cors.md`](../docs/adr/ADR-006-frontend-integration-without-cors.md).
 
 The specification this app implements is
 [`../docs/architecture/coffee-frontend.md`](../docs/architecture/coffee-frontend.md);

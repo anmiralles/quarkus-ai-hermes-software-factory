@@ -2,7 +2,7 @@
 
 Audience: anyone (human or bot) who needs the Coffee catalogue UI reachable in a browser on
 this box. Implements the operating notes of `docs/architecture/coffee-frontend.md` §9 and
-the accepted consequence of `docs/adr/ADR-003-frontend-integration-without-cors.md`.
+the accepted consequence of `docs/adr/ADR-006-frontend-integration-without-cors.md`.
 
 ## The two processes
 
@@ -99,4 +99,4 @@ expressed as an MSW handler in `src/test/handlers.ts` or a `server.use(...)` ove
 There is no deployment topology for this repository yet. When one appears, the proxy
 decision has to be revisited: the bundle must be served from the same origin as the API
 (reverse proxy or bundled into the service), or CORS becomes a required, `infosec`-reviewed
-backend decision. See ADR-003's "Revisit when".
+backend decision. See ADR-006's "Revisit when".
