@@ -36,12 +36,25 @@ Do not mark a card done on the strength of a green local build alone.
 
 ## Pull requests
 
-`gh` is **not on PATH** on this box. Always call it by absolute path:
+`gh` resolves as bare `gh` (via `/opt/data/.local/bin/gh`). Either form works:
 
 ```bash
-/opt/data/bin/gh pr create --base main --head task/<card-id>-<slug> \
+gh pr create --base main --head task/<slug> \
   --title "<card-id>: <summary>" --body-file /tmp/pr-body.md
 ```
+
+CI runs on every PR and on `main`: jobs `backend-tests` and `frontend-tests`, and
+both are **required** on `main` with *"branches must be up to date"*. A PR cannot
+merge until they pass **and** the branch contains current `main`. So before opening
+a PR:
+
+```bash
+git fetch origin main && git rebase origin/main
+git diff --stat origin/main...HEAD    # must list ONLY your card's files
+```
+
+If that diff lists the whole project, your branch was cut from a stale base. Fix it
+before opening — a full-tree PR cannot be reviewed as a delta.
 
 Every PR body states:
 
