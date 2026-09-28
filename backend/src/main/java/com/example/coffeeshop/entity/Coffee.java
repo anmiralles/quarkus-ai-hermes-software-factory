@@ -71,8 +71,14 @@ public class Coffee {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    protected Coffee() {
-        // JPA
+    /**
+     * Public because the boundary layer builds a candidate instance from a request body
+     * ({@code CoffeeRequest.toEntity()}) before handing it to control. It buys no encapsulation —
+     * every field already has a public setter — and it keeps the mapping in {@code boundary}, as
+     * spec section 1.2 requires, instead of putting a factory on the entity.
+     */
+    public Coffee() {
+        // JPA, and the boundary -> entity mapping step
     }
 
     @PrePersist
