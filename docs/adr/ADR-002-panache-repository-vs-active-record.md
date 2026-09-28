@@ -1,6 +1,6 @@
 # ADR-002: Panache repository pattern instead of Panache active record
 
-Status: accepted
+Status: accepted (type arguments corrected by [ADR-004](ADR-004-uuid-typed-panache-repository.md))
 Date: 2026-09-27
 Deciders: architect (card `t_db2182b6`)
 Governs: `backend/src/main/java/com/example/coffeeshop/entity/Coffee.java`,
