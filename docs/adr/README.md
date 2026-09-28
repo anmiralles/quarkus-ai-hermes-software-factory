@@ -6,8 +6,11 @@ instead). Format and rules: the `architecture-decision-records` skill.
 | ADR | Title | Status | Date |
 |---|---|---|---|
 | [ADR-001](ADR-001-bce-layering.md) | Boundary–Control–Entity layering for the Coffee service | accepted | 2026-09-27 |
-| [ADR-002](ADR-002-panache-repository-vs-active-record.md) | Panache repository pattern instead of Panache active record | accepted | 2026-09-27 |
-| [ADR-003](ADR-003-frontend-integration-without-cors.md) | Frontend reaches the backend through its own dev-server proxy, not CORS | accepted | 2026-09-28 |
+| [ADR-002](ADR-002-panache-repository-vs-active-record.md) | Panache repository pattern instead of Panache active record | accepted, refined by ADR-004 | 2026-09-27 |
+| [ADR-003](ADR-003-control-owned-page-read-model.md) | Paging returns a control-owned `CoffeePage`, not Panache's `Page` | accepted | 2026-09-28 |
+| [ADR-004](ADR-004-uuid-typed-panache-repository.md) | `CoffeeRepository implements PanacheRepositoryBase<Coffee, UUID>` | accepted, refines ADR-002 | 2026-09-28 |
+| [ADR-005](ADR-005-flyway-postgresql-module.md) | `quarkus-flyway-postgresql` is a declared dependency for the prod profile | accepted | 2026-09-28 |
+| [ADR-006](ADR-006-frontend-integration-without-cors.md) | The frontend reaches the backend through its own dev-server proxy, not through CORS | accepted | 2026-09-28 |
 
 Related specifications:
 
@@ -20,3 +23,15 @@ Related specifications:
 
 Decisions deliberately deferred rather than taken are listed in §7 (backend) and §10
 (frontend) of those documents — they are open questions, not ADRs.
+
+ADR-003 to ADR-005 were recorded on card `t_da7e20d9` when revision 2 of the specification
+was written to match the as-built service; §0 of that document is the revision log that
+points each change at the card that reported it. ADR-004 **refines** ADR-002 rather than
+superseding it: the decision to use a repository instead of Panache active record is
+unchanged, only the declared type arguments are corrected.
+
+ADR-006 was recorded on card `t_be0fd4f5` for the React frontend. It was written as ADR-003
+on that card's branch, but ADR-003–ADR-005 had already been taken by the backend cards by the
+time either branch reached `main`, so it was renumbered to ADR-006 to keep the sequence
+unique and this README consistent (tracked on card `t_e908df2f`). The decision itself is
+unchanged.

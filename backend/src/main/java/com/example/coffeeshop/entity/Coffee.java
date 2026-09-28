@@ -2,6 +2,7 @@ package com.example.coffeeshop.entity;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -83,14 +84,28 @@ public class Coffee {
 
     @PrePersist
     void onPersist() {
-        Instant now = Instant.now();
+        Instant now = storedInstant();
         this.createdAt = now;
         this.updatedAt = now;
     }
 
     @PreUpdate
     void onUpdate() {
-        this.updatedAt = Instant.now();
+        this.updatedAt = storedInstant();
+    }
+
+    /**
+     * {@link Instant#now()} is nanosecond-precision on this JVM, but {@code created_at}/{@code
+     * updated_at} are {@code TIMESTAMP WITH TIME ZONE}, whose resolution is the microsecond on both
+     * H2 and PostgreSQL. Persisting the nanosecond value would make the timestamp in the create
+     * response (serialised from the in-memory entity) differ from the value every later read gets
+     * back from the database, which rounds to microseconds. Truncating to microseconds makes what is
+     * written exactly what is returned, so a client that creates a coffee and immediately re-reads
+     * it sees the same value (spec sections 2 and 3.2). Truncation, not rounding: the value must
+     * never be advanced past the insert instant.
+     */
+    private static Instant storedInstant() {
+        return Instant.now().truncatedTo(ChronoUnit.MICROS);
     }
 
     public UUID getId() {

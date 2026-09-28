@@ -73,6 +73,13 @@
             <artifactId>quarkus-jdbc-postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- Flyway's PostgreSQL module: makes the prod database module explicit rather than
+             implicit in Quarkus's conditional-dependency resolution (ADR-005) -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-flyway-postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
         <!-- /q/openapi: the contract stays inspectable -->
         <dependency>
             <groupId>io.quarkus</groupId>
