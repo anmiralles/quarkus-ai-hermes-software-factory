@@ -33,7 +33,7 @@ independently against the running backend.
 
 **Non-goals (v1).**
 
-- No backend change, no backend test change, no CORS work on the backend (see ADR-003).
+- No backend change, no backend test change, no CORS work on the backend (see ADR-006).
 - No authentication or session handling — the API has none (spec §7 of `coffee-bce.md`).
 - No deployment artefact: no Dockerfile, no static hosting, no CI. "Accessible via
   browser" means the frontend's own dev/preview server on this box (§8 AC-F15).
@@ -52,7 +52,7 @@ card body.
 |---|---|
 | **D-1 Stack** | Vite + React + TypeScript, package manager **npm** (Node 26.5.1 / npm 11.17.0 are on the box; `pnpm` and `yarn` are **not** installed — do not introduce them). Test stack **Vitest + React Testing Library + `@testing-library/jest-dom` + `@testing-library/user-event`**, `jsdom` environment, **MSW v2** for network-level mocks. Server state via **TanStack Query v5**. |
 | **D-2 No router, no client-state library** | One page. No `react-router`, no Redux/Zustand/MobX/Jotai. The only client state is transient form/selection state, which is `useState` inside the component that owns it. |
-| **D-3 Integration without CORS** | The API client uses **same-origin relative paths** (`/coffees…`). The Vite dev server *and* preview server proxy `/coffees` to `http://localhost:8080`, overridable with the Vite env var `VITE_BACKEND_URL`. The backend is not touched. See **ADR-003**. |
+| **D-3 Integration without CORS** | The API client uses **same-origin relative paths** (`/coffees…`). The Vite dev server *and* preview server proxy `/coffees` to `http://localhost:8080`, overridable with the Vite env var `VITE_BACKEND_URL`. The backend is not touched. See **ADR-006**. |
 | **D-4 Errors come from the server, verbatim** | The frontend does **not** re-implement the backend's field rules (lengths, ranges, scale, enum values). It does minimal guards (a field is required, a number parses) and renders the server's RFC 7807 `errors[].message` strings against the named fields. Two copies of the validation rules will drift; one will not. |
 | **D-5 Request bodies carry exactly five fields** | Every `POST`/`PUT` body is `{name, roastLevel, origin, price, stock}` and nothing else. `id`, `createdAt`, `updatedAt` are **never** sent, and the edit form must **not** spread the `Coffee` object into the payload. The backend runs `quarkus.jackson.fail-on-unknown-properties=true`, so an extra field is a `400` (`coffee-bce.md` §3.4), not a silently ignored one. |
 | **D-6 `price` is a JSON number, never a string, never pre-rounded** | The input is parsed to a `number` before being sent. The UI does **not** round a 3-decimal input: it sends what the user typed and renders the server's `400` (`price must have at most 2 decimal places`) as a field error. Silent rounding is forbidden by `coffee-bce.md` §2 and §3.2. |
@@ -371,10 +371,10 @@ Notes for QA that save an hour:
   `infosec` review, not a frontend card.
 - **Deployment and hosting** (static bundle behind nginx, container image, CI pipeline) —
   no deployment topology exists in this repo for either tier; "accessible via browser" is
-  satisfied by the dev/preview server. The first real deployment is where ADR-003's revisit
+  satisfied by the dev/preview server. The first real deployment is where ADR-006's revisit
   trigger fires.
 - **Bundle-into-Quarkus** (`quarkus-quinoa` or static resources served by the service) —
-  rejected in ADR-003 for v1; revisit when a single deployable is actually wanted.
+  rejected in ADR-006 for v1; revisit when a single deployable is actually wanted.
 - **Optimistic updates, real-time refresh, ETag/`If-Match`** — the API has no version field
   (`coffee-bce.md` §7); a client cannot do conditional writes against a contract that has
   no conditional-write vocabulary.
@@ -391,7 +391,7 @@ Notes for QA that save an hour:
 
 - `factory-decomposition` — plan gate, decisions settled before fan-out, children linked to
   this card, one card / one branch / one PR, assignee-by-role.
-- `architecture-decision-records` — ADR-003 (frontend↔backend integration), format and
+- `architecture-decision-records` — ADR-006 (frontend↔backend integration), format and
   one-decision-per-file rules.
 - `java-cloud-native-stack` — README says the frontend meets the backend at an API contract
   and never at shared code; the proxy decision keeps the backend release frozen.

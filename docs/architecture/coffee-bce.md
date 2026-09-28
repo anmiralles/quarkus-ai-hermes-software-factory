@@ -1,7 +1,8 @@
 # Coffee service — BCE specification and domain contract
 
-Status: proposed (awaiting plan approval on card `t_db2182b6`)
+Status: accepted for v1 — revised 2026-09-28 (revision 2) to match the as-built implementation
 Card: `t_db2182b6` — "Define BCE spec and Coffee domain contract for Quarkus service"
+Revision: card `t_da7e20d9` — the as-built deltas are itemised in §0
 Supersedes: nothing. This is the contract three implementation cards build against:
 
 | Card | Title | Owner | Branch |
@@ -18,6 +19,80 @@ title. The table above is the canonical naming; implementers use it.
 implementation decision below may be changed by an implementer without a comment on
 `t_db2182b6` and a revision here — the QA card verifies against the numbered criteria at
 the end, so an undocumented deviation becomes a failed verification.
+
+---
+
+## 0. Revision log — the spec revised to match the as-built implementation
+
+**Revision 2, 2026-09-28, architect, card `t_da7e20d9`.**
+
+The three implementation cards and the QA card each recorded deviations from revision 1 on
+their own cards, and two of them asked for a revision *here* rather than editing the
+contract themselves — revision 1 (**This document is a specification**) says an
+implementer may not change a decision below without a comment on `t_db2182b6` **and** a
+revision here. This is that revision. The document now describes what was actually built,
+so the next reader compares it against the code instead of against a stack of PRs.
+
+Every row below was reported on a card, is implemented on the branch named, and was
+exercised by an executed command (§0.1).
+
+| # | Revision 1 said | Revision 2 says | Reported by | Implemented in |
+|---|---|---|---|---|
+| R1 | §5 `Page<Coffee> listCoffees(int, int)` | §5 `CoffeePage listCoffees(int, int)` — a control-owned record of `content`/`page`/`size`/`totalElements` | `t_8046549a` | PR #4 |
+| R2 | §6 `implements PanacheRepository<Coffee>` | §6 `implements PanacheRepositoryBase<Coffee, UUID>` | `t_f9e0a903` | PR #3 |
+| R3 | §6 `Page<Coffee> findAllPaged(int, int)` | §6 `List<Coffee> findAllPaged(int, int)`, page totals from the inherited `count()` | `t_f9e0a903` | PR #3 |
+| R4 | §2 `createdAt` set by `@PrePersist` with `Instant.now()` | §2 set with `Instant.now().truncatedTo(ChronoUnit.MICROS)` | `t_c41f5e3e` (defect D1) | PR #6 |
+| R5 | §4.5 `quarkus.jackson.serialization.write-dates-as-timestamps` | §4.5 `quarkus.jackson.write-dates-as-timestamps` | `t_c41f5e3e` (defect D2) | PR #6 |
+| R6 | §4.2 lists no Flyway PostgreSQL module; `./mvnw dependency:list` shows `flyway-core` alone | §4.2 adds `io.quarkus:quarkus-flyway-postgresql` (runtime) so the prod database module is **declared**, not implicit | `t_f9e0a903`; `t_c41f5e3e` (O2) | **outstanding** — follow-up card |
+| R7 | §5 paging violations throw `IllegalArgumentException` | §5 paging violations throw `control.exception.InvalidPagingException`, which extends `IllegalArgumentException` | `t_8046549a` | PR #4 |
+| R8 | §1.2 `control` allow-column omits `jakarta.persistence.*` | §1.2 `control` may import `jakarta.persistence.*` — the failure types a `flush` raises | `t_c41f5e3e` (O3) | PR #4 |
+| R9 | §3.1 lets JAX-RS bind `page`/`size` as integers | §5 binds them as `String` in `boundary` and parses them there, so a non-numeric value is the same contract-shaped `400`; the range rules stay in `control` | `t_8046549a` | PR #4 |
+
+R2, R3, R6 and R7 are **decisions this document takes now**, not transcriptions of a
+worker's choice: a worker had to invent each one mid-implementation. Each got its own ADR
+(§10). R1, R4, R5, R8 and R9 are corrections of the text to match a decision that did
+not change.
+
+**R6 is the only row with work still outstanding — and it is narrower than the cards that
+raised it implied.** Two cards reported that the prod PostgreSQL profile cannot run Flyway
+because `flyway-database-postgresql` is not on the classpath. Measured on the factory box,
+the first half of that is true and the second half is not:
+
+- `./mvnw dependency:list` (default profile) resolves `org.flywaydb:flyway-core:12.0.0` and
+  `io.quarkus:quarkus-flyway:3.33.3` — no PostgreSQL module. This is what the cards saw.
+- A **prod-profile** package (`./mvnw -B -DskipTests -Dquarkus.profile=prod package`) puts
+  `io.quarkus.quarkus-flyway-postgresql-3.33.3.jar` **and**
+  `org.flywaydb.flyway-database-postgresql-12.0.0.jar` in `target/quarkus-app/lib/main/`.
+  Quarkus's conditional-dependency mechanism adds the extension because `quarkus-flyway`
+  and `quarkus-jdbc-postgresql` are both present, which is what the extension's own
+  description states.
+
+So prod is **not** broken today, and this revision does not claim it is. What is missing is
+*visibility*: the module the deployed artifact actually ships does not appear in a
+dependency audit of the module (`dependency:list` reports `flyway-core` alone) and nothing
+in `backend/pom.xml` says the prod database module exists. §4.2 now declares it
+explicitly (ADR-005) and `backend-developer` owns the one-line pom change on a follow-up
+card — this card owns documents, not the build file. If a reviewer prefers to keep the
+pom as it is, the honest counter-argument is that the declaration is redundant today, not
+that it is unnecessary: it is the difference between a prod database module that is
+auditable and one that is implied by a build-time mechanism nothing in the module states.
+
+### 0.1 What "verified" means for this revision
+
+Revision 2 is documentation, so the claim to check is that revision 2 *describes the code
+that exists*. That was done two ways:
+
+1. the as-built service was built and tested from the tip of the implementation stack on
+   the factory box (toolchain from card `t_e1bded4b`); and
+2. §5, §6 and the paging/list path were read line by line against
+   `control/CoffeeService.java`, `control/CoffeePage.java`,
+   `entity/CoffeeRepository.java`, `entity/Coffee.java`, `boundary/CoffeeResource.java`
+   and `boundary/dto/CoffeePageResponse.java`.
+
+The exact command and its raw output are in the PR body for card `t_da7e20d9`.
+
+Revision 2 re-opens **no acceptance criterion**: the QA card's per-criterion verdict
+(§9.3) and the two defects it filed both stand, and D1/D2 are fixed on PR #6.
 
 ---
 
@@ -65,7 +140,7 @@ reader can tell from the import list alone which layer a class belongs to.
 | Package | may import | must not import |
 |---|---|---|
 | `entity` | `jakarta.persistence.*`, `jakarta.validation.*`, `org.hibernate.annotations.*`, `io.quarkus.hibernate.orm.panache.*`, `java.*` | `control.*`, `boundary.*`, `jakarta.ws.rs.*`, `jakarta.ws.rs.core.*`, Jackson DTO types |
-| `control` | `entity.*`, `jakarta.transaction.*`, `jakarta.enterprise.*`, `jakarta.inject.*`, its own `control.exception.*`, `java.*` | `boundary.*` (including `boundary.dto.*`), `jakarta.ws.rs.*`, `jakarta.ws.rs.core.*`, `io.quarkus.panache.common.*` |
+| `control` | `entity.*`, `jakarta.transaction.*`, `jakarta.enterprise.*`, `jakarta.inject.*`, `jakarta.persistence.*` (the failure types a `flush` raises, R8), its own `control.exception.*`, `java.*` | `boundary.*` (including `boundary.dto.*`), `jakarta.ws.rs.*`, `jakarta.ws.rs.core.*`, `io.quarkus.panache.common.*` |
 | `boundary` | `control.*`, `entity.*` (mapping only), `boundary.dto.*`, `jakarta.ws.rs.*`, `jakarta.ws.rs.core.*`, `jakarta.validation.*`, OpenAPI annotations, Jackson annotations | repository types (`CoffeeRepository`), `jakarta.persistence.*`, `EntityManager` |
 
 `boundary → entity` is allowed **for the mapping step only** (`CoffeeResponse.from(Coffee)`).
@@ -128,7 +203,7 @@ knows how Coffee is persisted.
 | `origin` | `String` | `origin varchar(100)` | no | Required. Trimmed. Country name as free text: length 1..100. No ISO-3166 validation — a wrong country name is a data-quality issue, not a contract violation. |
 | `price` | `java.math.BigDecimal` | `price numeric(10,2)` | no | Required. Must be `> 0` and `<= 99999999.99` (fits `numeric(10,2)`). At most 2 decimal places: a value with a 3rd significant decimal place is **rejected with 400, never silently rounded**. Persisted and serialised at scale 2. |
 | `stock` | `int` | `stock integer` | no | Required. `>= 0`. Upper bound is `Integer.MAX_VALUE`. |
-| `createdAt` | `java.time.Instant` | `created_at timestamp with time zone` | no | Set once by `@PrePersist` (`Instant.now()`, UTC). Never settable from the API. Immutable after insert (`updatable = false`). |
+| `createdAt` | `java.time.Instant` | `created_at timestamp with time zone` | no | Set once by `@PrePersist` with `Instant.now().truncatedTo(ChronoUnit.MICROS)` (UTC). Never settable from the API. Immutable after insert (`updatable = false`). |
 | `updatedAt` | `java.time.Instant` | `updated_at timestamp with time zone` | no | Set by `@PrePersist` (equal to `createdAt` on insert) and updated by `@PreUpdate`. Never settable from the API. `updatedAt >= createdAt` always holds. |
 
 Decisions inside this table that reviewers will ask about:
@@ -145,6 +220,15 @@ Decisions inside this table that reviewers will ask about:
   Deferred; see §7.
 - **`Instant`, not `LocalDateTime`.** Timestamps are absolute and timezone-free on the wire
   (`2026-09-27T19:45:12.123456Z`).
+- **Timestamps are truncated to microseconds before insert (R4).** `Instant.now()` is
+  nanosecond-resolution on this JVM, but `timestamp with time zone` stores microseconds on
+  both H2 and PostgreSQL. Persisting the nanosecond value made the timestamp echoed by the
+  `201`/`PUT` response — serialised from the in-memory entity — differ from the
+  value every later `GET` returns from the database. That is API-observable drift: defect D1
+  on card `t_c41f5e3e` (`...20:31:09.249908999Z` on create vs `...20:31:09.249909Z` on read).
+  Truncating, not rounding — the stored instant is never advanced past the insert instant,
+  and the `BigDecimal` price path is untouched because a 3rd decimal place is rejected, never
+  rounded.
 - **No soft delete, no audit columns, no `owner` field.** Out of scope for this contract.
 
 `entity/RoastLevel.java` is a plain enum (`LIGHT`, `MEDIUM`, `DARK`) in the `entity`
@@ -341,18 +425,32 @@ below were verified to exist in `quarkus-bom:3.33.3` before being written here.
 | `io.quarkus:quarkus-flyway` | compile | Schema migrations, the only writer of DDL |
 | `io.quarkus:quarkus-jdbc-h2` | runtime | H2 driver (dev + test profiles) |
 | `io.quarkus:quarkus-jdbc-postgresql` | runtime | PostgreSQL driver (prod profile) |
+| `io.quarkus:quarkus-flyway-postgresql` | runtime | Flyway's PostgreSQL module (`org.flywaydb:flyway-database-postgresql`) for the prod profile — R6 in §0 |
 | `io.quarkus:quarkus-smallrye-openapi` | compile | `/q/openapi` — the contract stays inspectable |
 | `io.quarkus:quarkus-junit5` | test | Quarkus test harness |
 | `io.quarkus:quarkus-junit5-mockito` | test | `@InjectMock` of the repository for control unit tests |
 | `io.rest-assured:rest-assured` | test | HTTP-level integration tests |
 
-Two notes that save an implementer an hour each:
+Notes that save an implementer an hour each:
 
 - The **current** artifact names are `quarkus-rest` / `quarkus-rest-jackson`. The
   `quarkus-resteasy-reactive-jackson` name used in card `t_f9e0a903` is the pre-3.9 legacy
   alias; it resolves but drags the deprecated stack in. Use the names in the table.
 - Hibernate ORM 6 + Panache classic is what 3.33.3 ships. ("Panache Next" lands in 3.36+;
   do not use it here.)
+- **`quarkus-flyway` brings `org.flywaydb:flyway-core` only, so declare the PostgreSQL
+  module explicitly (R6).** Since Flyway 10 the database support is a separate module.
+  Quarkus *does* resolve `io.quarkus:quarkus-flyway-postgresql` automatically for the prod
+  build when `quarkus-jdbc-postgresql` is present — measured: both
+  `quarkus-flyway-postgresql-3.33.3.jar` and
+  `org.flywaydb.flyway-database-postgresql-12.0.0.jar` appear in
+  `target/quarkus-app/lib/main/` of a `-Dquarkus.profile=prod` package. But the dependency
+  is invisible to `./mvnw dependency:list` on the default profile, which reports
+  `flyway-core` alone, so the module the deployed artifact actually ships does not show up
+  in a dependency audit and nothing in the pom mentions it. Declare it in
+  `backend/pom.xml` (scope `runtime`, version managed by `quarkus-bom:3.33.3`, like every
+  other extension — declare it without a version). dev and test (H2) are unaffected.
+  **Revision 2 decision, ADR-005; the pom entry itself is the follow-up card's work.**
 
 ### 4.3 Package and file layout
 
@@ -364,19 +462,28 @@ backend/
     entity/
       Coffee.java                 # @Entity, JPA + Bean Validation, lifecycle callbacks
       RoastLevel.java             # enum LIGHT | MEDIUM | DARK
-      CoffeeRepository.java       # PanacheRepository<Coffee> — persistence only
+      CoffeeRepository.java       # PanacheRepositoryBase<Coffee, UUID> — persistence only
     control/
       CoffeeService.java          # @ApplicationScoped, @Transactional, use cases
+      CoffeePage.java             # control-owned read model: content, page, size, totalElements
       exception/
         CoffeeNotFoundException.java
         CoffeeAlreadyExistsException.java
+        InvalidPagingException.java          # extends IllegalArgumentException
     boundary/
       CoffeeResource.java         # @Path("/coffees")
       error/
-        CoffeeNotFoundExceptionMapper.java   # -> 404 problem detail
+        ProblemDetail.java                     # RFC 7807 body record (package-private)
+        ProblemResponses.java                  # builder the mappers share
+        JacksonBodyErrors.java                 # field-path extraction for JSON failures
+        CoffeeNotFoundExceptionMapper.java     # -> 404 problem detail
         CoffeeAlreadyExistsExceptionMapper.java # -> 409 problem detail
-        ValidationExceptionMapper.java       # -> 400 problem detail + errors[]
-        GenericExceptionMapper.java          # -> 500 problem detail, no leakage
+        ValidationExceptionMapper.java         # -> 400 problem detail + errors[]
+        PagingExceptionMapper.java             # -> 400 problem detail
+        MismatchedInputExceptionMapper.java    # -> 400, unknown field
+        MalformedJsonExceptionMapper.java      # -> 400, malformed body
+        WrappedJsonExceptionMapper.java        # -> 400, unwraps Quarkus's wrapped JSON errors
+        GenericExceptionMapper.java            # -> 500 problem detail, no leakage
       dto/
         CoffeeRequest.java        # record
         CoffeeResponse.java       # record, static from(Coffee)
@@ -436,7 +543,7 @@ quarkus.http.root-path=/
 quarkus.hibernate-orm.database.generation=none
 quarkus.flyway.migrate-at-start=true
 quarkus.jackson.fail-on-unknown-properties=true
-quarkus.jackson.serialization.write-dates-as-timestamps=false
+quarkus.jackson.write-dates-as-timestamps=false
 
 # --- dev: file-backed H2 so data survives a restart ---
 %dev.quarkus.datasource.db-kind=h2
@@ -466,8 +573,15 @@ quarkus.jackson.serialization.write-dates-as-timestamps=false
   a deployment decision for later, not a spec default.
 - No CORS configuration, no auth, no rate limiting in v1. If the frontend card needs CORS,
   it is a new decision on a new card.
+- **`quarkus.datasource.db-kind` is build-time configuration, not runtime (R-O2).** The
+  packaged artifact is built for one database kind. A jar built with the default profile
+  bakes in `postgresql` and cannot be told `-Dquarkus.profile=dev` at launch to switch to
+  H2 — card `t_c41f5e3e` needed a `-Dquarkus.profile=dev` **build** to run the
+  restart-persistence check (AC-V6). Operating consequence to carry into the deployment
+  cards: dev, test and prod are three artifacts, and only the prod one has PostgreSQL as
+  its active kind.
 
-### 4.6 Build environment constraint (blocking for the implementers)
+### 4.6 Build environment constraint (resolved — kept as the record)
 
 Verified on the factory box on 2026-09-27, before this spec was written:
 
@@ -490,6 +604,15 @@ claim a green build.
 Do **not** work around the missing toolchain by committing pre-built artifacts, by
 switching to Gradle, or by vendoring dependencies into the repo.
 
+**Resolved 2026-09-27 by card `t_e1bded4b` (`devops`, PR #2).** Eclipse Temurin JDK
+21.0.12.1+1 and Apache Maven 3.9.16 are installed under `/opt/data/toolchains`
+(checksum-verified, user-level, no root and no Docker), and wired onto `JAVA_HOME`/`PATH`
+for the bot profiles by `scripts/provision-toolchain.sh`; the runbook is
+`docs/operations/build-toolchain.md`. `./mvnw -B clean verify` runs. The table above is
+kept as the record of *why* the installer exists and what it must reproduce on a rebuilt
+container. One part is **not** resolved: the Docker daemon is still unreachable, so
+Testcontainers-based PostgreSQL verification is still unavailable (see §7).
+
 ---
 
 ## 5. Control layer contract
@@ -501,10 +624,18 @@ switching to Gradle, or by vendoring dependencies into the repo.
 ```java
 Coffee createCoffee(Coffee candidate);                 // throws CoffeeAlreadyExistsException
 Coffee getCoffee(UUID id);                             // throws CoffeeNotFoundException
-Page<Coffee> listCoffees(int page, int size);          // throws IllegalArgumentException for bad paging
+CoffeePage listCoffees(int page, int size);            // throws InvalidPagingException for bad paging
 Coffee updateCoffee(UUID id, Coffee changes);          // NotFound | AlreadyExists
 void deleteCoffee(UUID id);                            // throws CoffeeNotFoundException
 ```
+
+`control/CoffeePage` is a record owned by `control`
+(`List<Coffee> content, int page, int size, long totalElements`) — the read model the
+boundary maps to `CoffeePageResponse`. It replaces revision 1's `Page<Coffee>` (R1/R3) for
+two reasons: `io.quarkus.panache.common.Page` carries no type parameter, so `Page<Coffee>`
+does not compile, and §1.2 forbids `control` from importing
+`io.quarkus.panache.common.*` at all. It is a control-owned value type, not a DTO:
+`boundary.dto` still never appears in a control signature. See ADR-003.
 
 Rules the implementation must honour:
 
@@ -515,13 +646,20 @@ Rules the implementation must honour:
 - **Transaction boundary is the service method.** `create`/`update`/`delete` are atomic.
   The resource never opens a transaction; the repository never does.
 - **Paging validation is control's**: `page >= 0`, `1 <= size <= 100`, else
-  `IllegalArgumentException("page must be >= 0")` / `("size must be between 1 and 100")`,
-  which the boundary mapper turns into a `400` problem detail. (Bean validation on query
+  `InvalidPagingException("page", "page must be >= 0")` /
+  `("size", "size must be between 1 and 100")`, which the boundary mapper turns into a
+  `400` problem detail (R7). `InvalidPagingException extends IllegalArgumentException`, so a
+  caller that only knows the standard contract still catches it. (Bean validation on query
   params is the alternative; control-side checks were chosen so the rule is unit-testable
   without HTTP.)
+- **The paging parameters are bound as `String` in `boundary` (R9).** Binding `page`/`size`
+  as `int` makes a non-numeric value a JAX-RS conversion failure with a container-chosen
+  body, which is not the contract's `400` problem detail. The resource parses them and
+  raises the same `InvalidPagingException`; the **range** rules stay in `control`, so they
+  remain unit-testable without HTTP.
 - **No HTTP vocabulary.** No `Response`, no `Status`, no `UriBuilder`, no `@PathParam`
   anywhere in `control`.
-- **Reads return entities.** Control returns `Coffee`/`Page<Coffee>`; the boundary maps
+- **Reads return entities.** Control returns `Coffee`/`CoffeePage`; the boundary maps
   them. This is what makes rule 3 checkable by grep.
 
 `control/exception/CoffeeNotFoundException` and `CoffeeAlreadyExistsException` extend
@@ -532,14 +670,22 @@ name for the mapper's `detail` string.
 
 ## 6. Repository contract (entity layer)
 
-`entity/CoffeeRepository implements PanacheRepository<Coffee>` — see ADR-002 for why not
-active record. Methods, with zero business logic:
+`entity/CoffeeRepository implements PanacheRepositoryBase<Coffee, UUID>` — see ADR-002 for
+why not active record, and ADR-004 for the id type argument. Methods, with zero business
+logic:
 
 | Method | Semantics |
 |---|---|
 | `Optional<Coffee> findByName(String name)` | Exact match on the stored (trimmed) name |
 | `List<Coffee> findByRoastLevel(RoastLevel level)` | Ordered by `name` asc, then `id` asc |
-| `Page<Coffee> findAllPaged(int page, int size)` | Ordered by `name` asc, then `id` asc; `page` is 0-based; `size` is already validated by control |
+| `List<Coffee> findAllPaged(int page, int size)` | One page, ordered by `name` asc, then `id` asc; `page` is 0-based; `size` is already validated by control. Page totals come from the inherited `count()` (R2/R3) |
+
+The interface is `PanacheRepositoryBase<Coffee, UUID>`, **not** `PanacheRepository<Coffee>`:
+the latter is `PanacheRepositoryBase<T, Long>` and would expose a `findById(Long)` that
+cannot be called correctly on an entity whose id is a `UUID`. `findAllPaged` returns
+`List<Coffee>` because `io.quarkus.panache.common.Page` is a *request* object, not a typed
+result page — the totals are a separate `count()`, which is what `control.listCoffees`
+needs to build `CoffeePage`. See ADR-003 and ADR-004.
 
 `findByRoastLevel` is **not** reachable from the API in v1 (no list filter). It exists
 because card `t_f9e0a903` requires it and because roast-level browsing is the obvious next
@@ -562,6 +708,14 @@ Recorded so that a reviewer or a future card does not read them as omissions:
   `BigDecimal` on the wire.
 - **OpenAPI in prod, CORS, authN/authZ, rate limiting, pagination links** — deployment- and
   client-driven; each needs its own card and (for auth) `infosec` review.
+- **The database unique constraint as the arbiter of a concurrent duplicate POST** —
+  revision 1's AC-V8 asserts that the `uq_coffee_name` constraint, not the pre-check, settles
+  a race. The QA card could not reproduce that on H2: three mutant-verified attempts all
+  resolved through the pre-check first. Proving it needs PostgreSQL via Testcontainers, and
+  this box has no Docker daemon (§4.6). Recorded as a **known verification gap**, not a
+  defect: the constraint is in `V1__create_coffee.sql`, and the `23505` → 409 mapping is
+  unit-tested independently. Revisit when a Docker daemon or a PostgreSQL service is
+  available.
 
 ---
 
@@ -584,7 +738,7 @@ Each criterion is written to be pass/fail by command. The QA card reports per cr
 
 | id | Criterion | Verified by |
 |---|---|---|
-| AC-E1 | `backend/pom.xml` declares `com.example:coffee-shop:1.0.0-SNAPSHOT`, `maven.compiler.release=17`, `io.quarkus.platform:quarkus-bom:3.33.3`, and exactly the deps of §4.2 | `grep` on `pom.xml`; `./mvnw -q help:evaluate -Dexpression=maven.compiler.release` |
+| AC-E1 | `backend/pom.xml` declares `com.example:coffee-shop:1.0.0-SNAPSHOT`, `maven.compiler.release=17`, `io.quarkus.platform:quarkus-bom:3.33.3`, and exactly the deps of §4.2 **as it stood at revision 1** — so *without* `quarkus-flyway-postgresql`, which is revision 2's R6 and a follow-up card | `grep` on `pom.xml`; `./mvnw -q help:evaluate -Dexpression=maven.compiler.release` |
 | AC-E2 | `entity/Coffee.java` has the fields, types and JPA mappings of §2, with `@UuidGenerator`, `@Enumerated(EnumType.STRING)`, and **no** `@Version` | read the file; assert no `@Version` |
 | AC-E3 | Bean Validation annotations enforce: `name` not blank + size 1..100, `origin` not blank + size 1..100, `price` `@NotNull @DecimalMin(exclusive) @DecimalMax`, `stock` `@Min(0)`, `roastLevel` `@NotNull`; a 3rd decimal place is rejected (`@Digits(integer=8, fraction=2)`) | `CoffeeRepositoryTest` validation cases |
 | AC-E4 | `@PrePersist` sets `createdAt` and `updatedAt`; `@PreUpdate` sets `updatedAt`; a persisted coffee read back has non-null timestamps with `updatedAt >= createdAt` | repository test with concrete assertions |
@@ -599,7 +753,7 @@ Each criterion is written to be pass/fail by command. The QA card reports per cr
 
 | id | Criterion | Verified by |
 |---|---|---|
-| AC-CB1 | `control/CoffeeService` implements exactly the §5 signatures, `@ApplicationScoped`, `@Transactional` on mutating methods, constructor-injected repository | read + unit test |
+| AC-CB1 | `control/CoffeeService` implements exactly the §5 signatures — including the `CoffeePage` return on `listCoffees` — `@ApplicationScoped`, `@Transactional` on mutating methods, constructor-injected repository | read + unit test |
 | AC-CB2 | All five endpoints of §3.1 exist with the exact status codes and `Location` header on 201 | `@QuarkusTest` + RestAssured |
 | AC-CB3 | `CoffeeRequest`/`CoffeeResponse`/`CoffeePageResponse` are records with exactly the §3.2 fields; `price` serialises at scale 2; timestamps serialise ISO-8601 UTC | integration test asserting the JSON shape field by field |
 | AC-CB4 | Paging: `page` default 0, `size` default 20, `size` 1..100, out-of-range or non-numeric → `400` (not clamped), ordering `name` asc then `id` asc, `totalPages` correct including 0 | integration tests at the boundaries (`page=0`, `size=1`, `size=100`, `size=101`, `page=-1`, `size=0`) |
@@ -634,6 +788,9 @@ Each criterion is written to be pass/fail by command. The QA card reports per cr
 |---|---|---|
 | ADR-001 | Boundary–Control–Entity layering with a strict import matrix and DTO-never-leaks-entity rule | `docs/adr/ADR-001-bce-layering.md` |
 | ADR-002 | Panache **repository** pattern (`PanacheRepository<Coffee>`) instead of Panache active record | `docs/adr/ADR-002-panache-repository-vs-active-record.md` |
+| ADR-003 | Paging returns a control-owned `CoffeePage`, not Panache's `Page` | `docs/adr/ADR-003-control-owned-page-read-model.md` |
+| ADR-004 | `CoffeeRepository implements PanacheRepositoryBase<Coffee, UUID>` | `docs/adr/ADR-004-uuid-typed-panache-repository.md` |
+| ADR-005 | `quarkus-flyway-postgresql` is a declared dependency for the prod profile | `docs/adr/ADR-005-flyway-postgresql-module.md` |
 
 The deferred decisions in §7 are not ADRs: they are *not* decisions, they are open
 questions with a stated revisit trigger. A future card that settles one writes its own ADR
